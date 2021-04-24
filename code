@@ -1,0 +1,191 @@
+import random
+import string
+import sqlite3
+
+
+def main():
+    while True:
+        print('1. Create an account')
+        print('2. Log into account')
+        print('0. Exit')
+        user_input = input()
+        if user_input == '1':
+            user_card.create_account()
+        elif user_input == '2':
+            print('Enter your card number:')
+            input_card = input()
+            print('Enter your PIN:')
+            input_pin = input()
+            if check_account(input_card, input_pin):
+                user_card.load_account(input_card, input_pin)
+                print('You have successfully logged in!')
+                print()
+                bye = login_menu()
+                if bye:
+                    break
+                else:
+                    continue
+            else:
+                print('Wrong card number or PIN!')
+                print()
+                continue
+        elif user_input == '0':
+            print('Bye!')
+            break
+        else:
+            print('Probably you made a mistake in the menu number. Please try again!')
+            continue
+
+
+def login_menu():
+    while True:
+        print('1. Balance')
+        print('2. Add income')
+        print('3. Do transfer')
+        print('4. Close account')
+        print('5. Log out')
+        print('0. Exit')
+        user_input = input()
+        if user_input == '1':
+            user_card.check_balance()
+            continue
+        elif user_input == '2':
+            print('Enter income:')
+            user_card.add_income(int(input()))
+            print('Income was added!')
+            print()
+            continue
+        elif user_input == '3':
+            print('Transfer')
+            print('Enter card number:')
+            transfer_card = input()
+            if str(algorithm_luna(transfer_card[:-1])) != transfer_card[-1]:
+                print('Probably you made a mistake in the card number. Please try again!')
+                continue
+            elif transfer_card == user_card.card_number:
+                print('You can\'t transfer money to the same account!')
+                continue
+            elif not check_card(transfer_card):
+                print('Such a card does not exist.')
+                continue
+            else:
+                print('Enter how much money you want to transfer:')
+                transfer_money = int(input())
+                if transfer_money > user_card.balance:
+                    print('Not enough money!')
+                    continue
+                else:
+                    user_card.transfer(transfer_card, transfer_money)
+                    continue
+        elif user_input == '4':
+            user_card.drop_account()
+            break
+        elif user_input == '5':
+            print('You have successfully logged out!')
+            print()
+            break
+        else:
+            print('Bye!')
+            return True
+
+
+def algorithm_luna(number):
+    control_sum = 0
+    for i in range(len(number)):
+        num = int(number[i])
+        if i % 2 == 0:
+            if num * 2 > 9:
+                control_sum += (num * 2) // 10 + (num * 2) % 10
+            else:
+                control_sum += num * 2
+        else:
+            control_sum += num
+    if control_sum % 10 == 0:
+        return 0
+    else:
+        return (control_sum // 10 + 1) * 10 - control_sum
+
+
+def check_account(enter_card, enter_pin):
+    cur.execute('SELECT pin FROM card WHERE number = ?', (enter_card, ))
+    res_select = cur.fetchone()
+    if res_select:
+        if res_select[0] == enter_pin:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+
+def check_card(enter_card):
+    cur.execute('SELECT pin FROM card WHERE number = ?', (enter_card, ))
+    res_select = cur.fetchone()
+    if res_select:
+        return True
+    else:
+        return False
+
+
+class CreditCard:
+    def __init__(self):
+        self.iin = '400000'
+        self.account_number = None
+        self.check = None
+        self.card_number = None
+        self.pin = None
+        self.balance = 0
+    
+    def create_account(self):
+        self.account_number = ''.join(random.choice(string.digits) for i in range(9))
+        self.pin = ''.join(random.choice(string.digits) for i in range(4))
+        self.check = str(algorithm_luna(self.iin + self.account_number))
+        self.card_number = self.iin + self.account_number + self.check
+        cur.execute('INSERT INTO card (number, pin, balance) VALUES (?, ?, ?)', (self.card_number, self.pin, 0))
+        conn.commit()
+        print('Your card has been created')
+        print('Your card number:')
+        print(self.card_number)
+        print('Your card PIN:')
+        print(self.pin)
+        print()
+
+    def load_account(self, load_card, load_pin):
+        self.card_number = load_card
+        self.pin = load_pin
+        cur.execute('SELECT balance FROM card WHERE number = ?', (self.card_number, ))
+        self.balance = cur.fetchone()[0]
+
+    def check_balance(self):
+        print('Balance: ' + str(self.balance))
+        print()
+
+    def add_income(self, money):
+        self.balance += int(money)
+        cur.execute('UPDATE card SET balance = ? WHERE number = ?', (self.balance, self.card_number))
+        conn.commit()
+
+    def transfer(self, card, money):
+        self.add_income(-money)
+        cur.execute('UPDATE card SET balance = ? WHERE number = ?', (money, card))
+        conn.commit()
+        print('Success!')
+        print()
+
+    def drop_account(self):
+        cur.execute('DELETE FROM card WHERE number = ?', (self.card_number,))
+        conn.commit()
+        print('The account has been closed!')
+        print()
+
+
+if __name__ == '__main__':
+    conn = sqlite3.connect('card.s3db')
+    cur = conn.cursor()
+    cur.execute('''CREATE TABLE IF NOT EXISTS card (id INTEGER PRIMARY KEY, 
+                                                    number TEXT, 
+                                                    pin TEXT, 
+                                                    balance INTEGER DEFAULT 0)''')
+    conn.commit()
+    user_card = CreditCard()
+    main()
